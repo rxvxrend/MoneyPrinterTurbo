@@ -17,16 +17,16 @@ def is_running_in_container(
     cgroup_path: str = "/proc/1/cgroup",
 ) -> bool:
     """
-    判断当前进程是否运行在容器内。
+    Определяет, запущен ли текущий процесс внутри контейнера.
 
-    这个判断主要用于 Ollama 默认地址选择：
-    - 普通本机运行时，`localhost` 指向用户机器本身；
-    - Docker 容器内，`localhost` 指向容器自己，访问宿主机 Ollama
-      通常需要使用 `host.docker.internal`。
+    Проверка в основном нужна для выбора адреса Ollama по умолчанию:
+    - при обычном локальном запуске `localhost` указывает на машину пользователя;
+    - внутри Docker-контейнера `localhost` указывает на сам контейнер, поэтому для доступа
+      к Ollama на хосте обычно нужен `host.docker.internal`.
 
-    不能只判断 `/proc/1/cgroup` 是否存在，因为普通 Linux 也会有这个文件。
-    这里只在检测到明确的容器标记时返回 True，避免误伤非 Docker Linux 用户。
-    参数保留为可注入路径，便于单元测试覆盖不同运行环境。
+    Нельзя проверять только наличие `/proc/1/cgroup`, потому что этот файл есть и в обычном Linux.
+    Здесь возвращаем True только при явных контейнерных маркерах, чтобы не задеть пользователей Linux без Docker.
+    Параметры оставлены инъектируемыми, чтобы unit-тесты могли покрывать разные окружения.
     """
     if os.path.isfile(dockerenv_path) or os.path.isfile(containerenv_path):
         return True
@@ -49,9 +49,9 @@ def _can_resolve_hostname(hostname: str) -> bool:
 
 
 def _decode_linux_route_gateway(hex_gateway: str) -> str:
-    # /proc/net/route 里的 Gateway 是 16 进制小端序，例如 010011AC 表示
-    # 172.17.0.1。这里单独解析，是为了在原生 Linux Docker 没有
-    # host.docker.internal DNS 记录时，还能尝试访问容器默认网关上的宿主机。
+    # Gateway в /proc/net/route хранится как hex little-endian; например, 010011AC означает
+    # 172.17.0.1. Разбираем его отдельно, чтобы в native Linux Docker без DNS-записи
+    # host.docker.internal все еще можно было попробовать обратиться к хосту через default gateway контейнера.
     if len(hex_gateway) != 8:
         raise ValueError("invalid gateway length")
 
@@ -64,12 +64,13 @@ def _decode_linux_route_gateway(hex_gateway: str) -> str:
 
 def get_container_default_gateway_ip(route_path: str = "/proc/net/route") -> str:
     """
-    读取 Linux 容器里的默认网关 IP。
+    Читает IP default gateway внутри Linux-контейнера.
 
-    Docker Desktop 通常提供 `host.docker.internal`，但原生 Linux Docker
-    默认不一定提供这个 DNS 名称。默认网关通常可以作为访问宿主机服务的
-    兜底地址；如果用户的 Ollama 只监听 127.0.0.1，则仍需要用户让
-    Ollama 监听宿主机网卡或手动配置 `ollama_base_url`。
+    Docker Desktop обычно предоставляет `host.docker.internal`, но native Linux Docker
+    по умолчанию не всегда предоставляет это DNS-имя. Default gateway часто можно использовать
+    как fallback-адрес для доступа к сервисам хоста; если Ollama слушает только 127.0.0.1,
+    пользователю все равно нужно разрешить Ollama слушать сетевой интерфейс хоста или вручную
+    настроить `ollama_base_url`.
     """
     try:
         with open(route_path, mode="r", encoding="utf-8") as fp:
@@ -98,10 +99,11 @@ def get_container_default_gateway_ip(route_path: str = "/proc/net/route") -> str
 
 def get_default_ollama_base_url() -> str:
     """
-    返回 Ollama 的默认 OpenAI-compatible base_url。
+    Возвращает OpenAI-compatible base_url Ollama по умолчанию.
 
-    用户显式配置 `ollama_base_url` 时不会走这里；这里只处理“未配置时的
-    最佳默认值”。容器内默认指向宿主机，普通本机运行默认指向 localhost。
+    Если пользователь явно настроил `ollama_base_url`, этот путь не используется; здесь
+    обрабатывается только «лучшее значение по умолчанию», когда настройка отсутствует.
+    В контейнере адрес по умолчанию указывает на хост, при обычном локальном запуске — на localhost.
     """
     if not is_running_in_container():
         return "http://localhost:11434/v1"

@@ -1,15 +1,15 @@
-# Use an official Python runtime as a parent image
+# Используем официальный Python runtime как базовый образ
 FROM python:3.11-slim-bullseye
 
-# Set the working directory in the container
+# Задаем рабочий каталог в контейнере
 WORKDIR /MoneyPrinterTurbo
 
-# 设置/MoneyPrinterTurbo目录权限为777
+# Выставляем права 777 для каталога /MoneyPrinterTurbo
 RUN chmod 777 /MoneyPrinterTurbo
 
 ENV PYTHONPATH="/MoneyPrinterTurbo"
 
-# Install system dependencies with domestic mirrors first for stability
+# Устанавливаем системные зависимости: сначала пробуем локальные зеркала для стабильности
 RUN echo "deb http://mirrors.aliyun.com/debian bullseye main" > /etc/apt/sources.list && \
     echo "deb http://mirrors.aliyun.com/debian-security bullseye-security main" >> /etc/apt/sources.list && \
     ( \
@@ -44,31 +44,31 @@ RUN echo "deb http://mirrors.aliyun.com/debian bullseye main" > /etc/apt/sources
         done \
     ) && rm -rf /var/lib/apt/lists/*
 
-# Fix security policy for ImageMagick
+# Исправляем политику безопасности ImageMagick
 RUN sed -i '/<policy domain="path" rights="none" pattern="@\*"/d' /etc/ImageMagick-6/policy.xml
 
-# Copy only the requirements.txt first to leverage Docker cache
+# Сначала копируем только requirements.txt, чтобы использовать Docker cache
 COPY requirements.txt ./
 
-# Install Python dependencies with domestic mirrors first and retry logic
+# Устанавливаем Python-зависимости: сначала локальные зеркала и retry-логика
 RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com --retries 3 --timeout 60 -r requirements.txt || \
     pip install --no-cache-dir -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/ --trusted-host mirrors.tuna.tsinghua.edu.cn --retries 3 --timeout 60 -r requirements.txt || \
     pip install --no-cache-dir --retries 3 --timeout 60 -r requirements.txt
 
-# Now copy the rest of the codebase into the image
+# Затем копируем остальной код в образ
 COPY . .
 
-# Expose the port the app runs on
+# Открываем порт, на котором работает приложение
 EXPOSE 8501
 
-# Command to run the application
+# Команда запуска приложения
 CMD ["streamlit", "run", "./webui/Main.py","--browser.serverAddress=127.0.0.1","--server.enableCORS=True","--browser.gatherUsageStats=False"]
 
-# 1. Build the Docker image using the following command
+# 1. Соберите Docker-образ следующей командой
 # docker build -t moneyprinterturbo .
 
-# 2. Run the Docker container using the following command
-## For Linux or MacOS:
+# 2. Запустите Docker-контейнер следующей командой
+## Для Linux или macOS:
 # docker run -v $(pwd)/config.toml:/MoneyPrinterTurbo/config.toml -v $(pwd)/storage:/MoneyPrinterTurbo/storage -p 127.0.0.1:8501:8501 moneyprinterturbo
-## For Windows:
+## Для Windows:
 # docker run -v ${PWD}/config.toml:/MoneyPrinterTurbo/config.toml -v ${PWD}/storage:/MoneyPrinterTurbo/storage -p 127.0.0.1:8501:8501 moneyprinterturbo
