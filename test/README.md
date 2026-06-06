@@ -1,40 +1,40 @@
-# MoneyPrinterTurbo Test Directory
+# Каталог тестов MoneyPrinterTurbo
 
-This directory contains unit tests for the **MoneyPrinterTurbo** project.
+Этот каталог содержит unit-тесты проекта **MoneyPrinterTurbo**.
 
-## Directory Structure
+## Структура каталогов
 
-- `services/`: Tests for components in the `app/services` directory  
-  - `test_video.py`: Tests for the video service  
-  - `test_task.py`: Tests for the task service  
-  - `test_voice.py`: Tests for the voice service  
+- `services/`: тесты компонентов из каталога `app/services`
+  - `test_video.py`: тесты видеосервиса
+  - `test_task.py`: тесты сервиса задач
+  - `test_voice.py`: тесты сервиса озвучки
 
-## Running Tests
+## Запуск тестов
 
-You can run the tests using Python’s built-in `unittest` framework:
+Тесты можно запускать встроенным в Python фреймворком `unittest`:
 
 ```bash
-# Run all tests
+# Запустить все тесты
 python -m unittest discover -s test
 
-# Run a specific test file
+# Запустить конкретный файл тестов
 python -m unittest test/services/test_video.py
 
-# Run a specific test class
+# Запустить конкретный класс тестов
 python -m unittest test.services.test_video.TestVideoService
 
-# Run a specific test method
+# Запустить конкретный метод теста
 python -m unittest test.services.test_video.TestVideoService.test_preprocess_video
-````
+```
 
-## Adding New Tests
+## Добавление новых тестов
 
-To add tests for other components, follow these guidelines:
+Чтобы добавить тесты для других компонентов, следуйте правилам:
 
-1. Create test files prefixed with `test_` in the appropriate subdirectory
-2. Use `unittest.TestCase` as the base class for your test classes
-3. Name test methods with the `test_` prefix
+1. Создавайте файлы тестов с префиксом `test_` в подходящем подкаталоге.
+2. Используйте `unittest.TestCase` как базовый класс тестовых классов.
+3. Называйте тестовые методы с префиксом `test_`.
 
-## Test Resources
+## Ресурсы тестов
 
-Place any resource files required for testing in the `test/resources` directory.
+Файлы ресурсов, необходимые для тестов, помещайте в каталог `test/resources`.

@@ -7,7 +7,7 @@ import requests
 import streamlit as st
 from loguru import logger
 
-# Add the root directory of the project to the system path to allow importing modules from the project
+# Добавляем корневой каталог проекта в sys.path, чтобы импортировать модули проекта
 root_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 if root_dir not in sys.path:
     sys.path.append(root_dir)
@@ -51,7 +51,7 @@ h1 {
 """
 st.markdown(streamlit_style, unsafe_allow_html=True)
 
-# 定义资源目录
+# Определяем каталоги ресурсов
 font_dir = os.path.join(root_dir, "resource", "fonts")
 song_dir = os.path.join(root_dir, "resource", "songs")
 i18n_dir = os.path.join(root_dir, "webui", "i18n")
@@ -74,13 +74,13 @@ if "use_custom_system_prompt" not in st.session_state:
 if "ui_language" not in st.session_state:
     st.session_state["ui_language"] = config.ui.get("language", system_locale)
 if "local_video_materials" not in st.session_state:
-    # 记住用户最近一次已经落盘的本地素材，避免仅修改文案后二次生成时丢失素材列表。
+    # Запоминаем последние локальные материалы, сохраненные на диск, чтобы при повторной генерации после изменения только сценария список материалов не потерялся.
     st.session_state["local_video_materials"] = []
 
-# 加载语言文件
+# Загружаем языковые файлы
 locales = utils.load_locales(i18n_dir)
 
-# 创建一个顶部栏，包含标题和语言选择
+# Создаем верхнюю панель с заголовком и выбором языка
 title_col, lang_col = st.columns([3, 1])
 
 with title_col:
@@ -95,7 +95,7 @@ with lang_col:
             selected_index = i
 
     selected_language = st.selectbox(
-        "Language / 语言",
+        "Language / Язык",
         options=display_languages,
         index=selected_index,
         key="top_language_selector",
@@ -141,15 +141,15 @@ def get_all_songs():
 
 def open_task_folder(task_id):
     try:
-        # task_id 应始终是服务端生成的 UUID。这里先做格式校验，避免异常值
-        # 通过路径拼接访问任务目录之外的位置，也避免后续打开目录时触发
-        # 平台 shell 对特殊字符的解释。
+        # task_id всегда должен быть UUID, созданным сервером. Сначала проверяем формат, чтобы некорректное значение
+        # не смогло через склейку путей выйти за пределы каталога задач, а последующее открытие папки
+        # не передало специальные символы shell платформы.
         normalized_task_id = str(UUID(str(task_id)))
         tasks_root = os.path.abspath(os.path.join(root_dir, "storage", "tasks"))
         path = os.path.abspath(os.path.join(tasks_root, normalized_task_id))
 
-        # 即使 UUID 校验通过，也再次确认最终路径仍在任务根目录内，避免
-        # 未来调用方调整 task_id 来源时引入路径穿越风险。
+        # Даже после проверки UUID дополнительно убеждаемся, что итоговый путь остается внутри корня задач,
+        # чтобы будущие изменения источника task_id не внесли риск path traversal.
         if not path.startswith(tasks_root + os.sep):
             logger.warning(f"invalid task folder path: {path}")
             return
@@ -182,14 +182,14 @@ def init_log():
     _lvl = "DEBUG"
 
     def format_record(record):
-        # 获取日志记录中的文件全路径
+        # Получаем полный путь к файлу из записи журнала
         file_path = record["file"].path
-        # 将绝对路径转换为相对于项目根目录的路径
+        # Преобразуем абсолютный путь в путь относительно корня проекта
         relative_path = os.path.relpath(file_path, root_dir)
-        # 更新记录中的文件路径
+        # Обновляем путь к файлу в записи
         record["file"].path = f"./{relative_path}"
-        # 返回修改后的格式字符串
-        # 您可以根据需要调整这里的格式
+        # Возвращаем измененную строку формата
+        # При необходимости этот формат можно изменить
         record["message"] = record["message"].replace(root_dir, ".")
 
         _format = (
@@ -248,7 +248,7 @@ def get_groq_model_ids(api_key: str, base_url: str) -> list[str]:
         logger.warning(f"failed to fetch groq models: {e}")
         return []
 
-# 创建基础设置折叠框
+# Создаем раскрываемый блок базовых настроек
 if not config.app.get("hide_config", False):
     with st.expander(tr("Basic Settings"), expanded=False):
         config_panels = st.columns(3)
@@ -256,31 +256,31 @@ if not config.app.get("hide_config", False):
         middle_config_panel = config_panels[1]
         right_config_panel = config_panels[2]
 
-        # 左侧面板 - 日志设置
+        # Левая панель — настройки журнала
         with left_config_panel:
-            # 是否隐藏配置面板
+            # Скрывать ли панель конфигурации
             hide_config = st.checkbox(
                 tr("Hide Basic Settings"), value=config.app.get("hide_config", False)
             )
             config.app["hide_config"] = hide_config
 
-            # 是否禁用日志显示
+            # Отключать ли отображение журнала
             hide_log = st.checkbox(
                 tr("Hide Log"), value=config.ui.get("hide_log", False)
             )
             config.ui["hide_log"] = hide_log
 
-        # 中间面板 - LLM 设置
+        # Средняя панель — настройки LLM
 
         with middle_config_panel:
             st.write(tr("LLM Settings"))
-            # 下拉框需要展示“AIHubMix（推荐）”这类面向用户的文案，
-            # 但配置文件和后端逻辑必须继续使用稳定的小写 provider id。
-            # 因此这里显式维护 display label 和 provider id 的映射，避免
-            # UI 文案变化污染 `config.app["llm_provider"]`。
+            # В выпадающем списке нужно показывать пользовательские подписи вроде «AIHubMix (рекомендуется)»,
+            # но конфигурация и backend должны продолжать использовать стабильные provider id в нижнем регистре.
+            # Поэтому здесь явно поддерживается соответствие display label и provider id, чтобы
+            # изменения UI-текста не загрязняли `config.app["llm_provider"]`.
             aihubmix_label = f"AIHubMix ({tr('Recommended')})"
             if config.ui.get("language") == "zh":
-                aihubmix_label = "AIHubMix（推荐）"
+                aihubmix_label = "AIHubMix (рекомендуется)"
             llm_provider_options = [
                 ("OpenAI", "openai"),
                 (aihubmix_label, "aihubmix"),
@@ -340,14 +340,14 @@ if not config.app.get("hide_config", False):
                 with llm_helper:
                     docker_hint = ""
                     if config.is_running_in_container():
-                        docker_hint = "\n                            > 检测到容器环境，未配置 Base Url 时会默认使用 `http://host.docker.internal:11434/v1`\n"
+                        docker_hint = "\n                             > Обнаружена контейнерная среда; если Base Url не задан, по умолчанию будет `http://host.docker.internal:11434/v1`\n"
                     tips = f"""
-                            ##### Ollama配置说明
-                            - **API Key**: 随便填写，比如 123
-                            - **Base Url**: 一般为 http://localhost:11434/v1
-                                - 如果 `MoneyPrinterTurbo` 和 `Ollama` **不在同一台机器上**，需要填写 `Ollama` 机器的IP地址
-                                - 如果 `MoneyPrinterTurbo` 是 `Docker` 部署，建议填写 `http://host.docker.internal:11434/v1`{docker_hint}
-                            - **Model Name**: 使用 `ollama list` 查看，比如 `qwen:7b`
+                            ##### Настройка Ollama
+                            - **API Key**: укажите любое значение, например 123
+                            - **Base Url**: обычно http://localhost:11434/v1
+                                - если `MoneyPrinterTurbo` и `Ollama` **не на одной машине**, укажите IP-адрес машины с `Ollama`
+                                - если `MoneyPrinterTurbo` развернут через `Docker`, рекомендуется `http://host.docker.internal:11434/v1`{docker_hint}
+                            - **Model Name**: смотрите через `ollama list`, например `qwen:7b`
                             """
 
             if llm_provider == "openai":
@@ -355,11 +355,11 @@ if not config.app.get("hide_config", False):
                     llm_model_name = "gpt-3.5-turbo"
                 with llm_helper:
                     tips = """
-                            ##### OpenAI 配置说明
-                            > 需要VPN开启全局流量模式
-                            - **API Key**: [点击到官网申请](https://platform.openai.com/api-keys)
-                            - **Base Url**: 官方 OpenAI 可留空；如果使用 OpenAI 兼容供应商（例如 OpenRouter），请填写对应的兼容接口地址
-                            - **Model Name**: 填写**有权限**的模型；如果使用兼容供应商，请填写该平台支持的模型 ID
+                            ##### Настройка OpenAI
+                             > Может потребоваться VPN в режиме global traffic
+                            - **API Key**: [получить на официальном сайте](https://platform.openai.com/api-keys)
+                            - **Base Url**: для официального OpenAI можно оставить пустым; для OpenAI-совместимого провайдера (например OpenRouter) укажите его совместимый endpoint
+                            - **Model Name**: укажите модель, к которой есть доступ; для совместимого провайдера укажите model ID этой платформы
                             """
 
             if llm_provider == "aihubmix":
@@ -369,16 +369,16 @@ if not config.app.get("hide_config", False):
                     llm_base_url = "https://aihubmix.com/v1"
                 with llm_helper:
                     tips = """
-                            ##### AIHubMix 配置说明
-                            - **注册链接**: [点击注册 AIHubMix](https://aihubmix.com/?aff=CEve)
-                            - **Base Url**: 预填 https://aihubmix.com/v1
-                            - **推荐模型**: 默认 gpt-5.4-mini，也可以填写 AIHubMix 支持的免费模型或其它模型 ID
+                            ##### Настройка AIHubMix
+                            - **Регистрация**: [зарегистрироваться в AIHubMix](https://aihubmix.com/?aff=CEve)
+                            - **Base Url**: предзаполнено https://aihubmix.com/v1
+                            - **Рекомендуемая модель**: по умолчанию gpt-5.4-mini; также можно указать бесплатную или другую модель, поддерживаемую AIHubMix
 
-                            推荐理由：
-                            - **模型全**: Claude、GPT、Gemini、Grok、DeepSeek、通义等 700+ 模型一站覆盖
-                            - **稳定**: 无限并发，永远在线，集群部署于谷歌云，长期为众多知名应用提供高并发服务
-                            - **能力完整**: 文本、图片生成、视频生成、TTS、STT、向量嵌入、Rerank，多模态场景全搞定
-                            - **计费透明**: 按量付费，无会员无包月，免费模型可使用
+                            Почему рекомендуется:
+                            - **Широкий выбор моделей**: единый доступ к 700+ моделям, включая Claude, GPT, Gemini, Grok, DeepSeek, Qwen и др.
+                            - **Стабильность**: высокая параллельность, постоянная доступность, кластер в Google Cloud, длительная поддержка высоконагруженных приложений
+                            - **Полный набор возможностей**: текст, генерация изображений и видео, TTS, STT, embeddings, rerank и мультимодальные сценарии
+                            - **Прозрачная оплата**: pay-as-you-go, без подписок и месячных пакетов; доступны бесплатные модели
                             """
 
             if llm_provider == "moonshot":
@@ -386,22 +386,22 @@ if not config.app.get("hide_config", False):
                     llm_model_name = "moonshot-v1-8k"
                 with llm_helper:
                     tips = """
-                            ##### Moonshot 配置说明
-                            - **API Key**: [点击到官网申请](https://platform.moonshot.cn/console/api-keys)
-                            - **Base Url**: 固定为 https://api.moonshot.cn/v1
-                            - **Model Name**: 比如 moonshot-v1-8k，[点击查看模型列表](https://platform.moonshot.cn/docs/intro#%E6%A8%A1%E5%9E%8B%E5%88%97%E8%A1%A8)
+                            ##### Настройка Moonshot
+                            - **API Key**: [получить на официальном сайте](https://platform.moonshot.cn/console/api-keys)
+                            - **Base Url**: фиксированно https://api.moonshot.cn/v1
+                            - **Model Name**: например moonshot-v1-8k, [список моделей](https://platform.moonshot.cn/docs/intro#%E6%A8%A1%E5%9E%8B%E5%88%97%E8%A1%A8)
                             """
             if llm_provider == "oneapi":
                 if not llm_model_name:
                     llm_model_name = (
-                        "claude-3-5-sonnet-20240620"  # 默认模型，可以根据需要调整
+                        "claude-3-5-sonnet-20240620"  # Модель по умолчанию; можно изменить при необходимости
                     )
                 with llm_helper:
                     tips = """
-                        ##### OneAPI 配置说明
-                        - **API Key**: 填写您的 OneAPI 密钥
-                        - **Base Url**: 填写 OneAPI 的基础 URL
-                        - **Model Name**: 填写您要使用的模型名称，例如 claude-3-5-sonnet-20240620
+                        ##### Настройка OneAPI
+                        - **API Key**: укажите ваш ключ OneAPI
+                        - **Base Url**: укажите базовый URL OneAPI
+                        - **Model Name**: укажите имя модели, например claude-3-5-sonnet-20240620
                         """
 
             if llm_provider == "qwen":
@@ -409,10 +409,10 @@ if not config.app.get("hide_config", False):
                     llm_model_name = "qwen-max"
                 with llm_helper:
                     tips = """
-                            ##### 通义千问Qwen 配置说明
-                            - **API Key**: [点击到官网申请](https://dashscope.console.aliyun.com/apiKey)
-                            - **Base Url**: 留空
-                            - **Model Name**: 比如 qwen-max，[点击查看模型列表](https://help.aliyun.com/zh/dashscope/developer-reference/model-introduction#3ef6d0bcf91wy)
+                            ##### Настройка Qwen
+                            - **API Key**: [получить на официальном сайте](https://dashscope.console.aliyun.com/apiKey)
+                            - **Base Url**: оставьте пустым
+                            - **Model Name**: например qwen-max, [список моделей](https://help.aliyun.com/zh/dashscope/developer-reference/model-introduction#3ef6d0bcf91wy)
                             """
 
             if llm_provider == "g4f":
@@ -420,20 +420,20 @@ if not config.app.get("hide_config", False):
                     llm_model_name = "gpt-3.5-turbo"
                 with llm_helper:
                     tips = """
-                            ##### gpt4free 配置说明
-                            > [GitHub开源项目](https://github.com/xtekky/gpt4free)，可以免费使用GPT模型，但是**稳定性较差**
-                            - **API Key**: 随便填写，比如 123
-                            - **Base Url**: 留空
-                            - **Model Name**: 比如 gpt-3.5-turbo，[点击查看模型列表](https://github.com/xtekky/gpt4free/blob/main/g4f/models.py#L308)
+                            ##### Настройка gpt4free
+                             > [Open-source проект на GitHub](https://github.com/xtekky/gpt4free), позволяет бесплатно использовать GPT-модели, но **стабильность ниже**
+                            - **API Key**: укажите любое значение, например 123
+                            - **Base Url**: оставьте пустым
+                            - **Model Name**: например gpt-3.5-turbo, [список моделей](https://github.com/xtekky/gpt4free/blob/main/g4f/models.py#L308)
                             """
             if llm_provider == "azure":
                 with llm_helper:
                     tips = """
-                            ##### Azure 配置说明
-                            > [点击查看如何部署模型](https://learn.microsoft.com/zh-cn/azure/ai-services/openai/how-to/create-resource)
-                            - **API Key**: [点击到Azure后台创建](https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/CognitiveServicesHub/~/OpenAI)
-                            - **Base Url**: 留空
-                            - **Model Name**: 填写你实际的部署名
+                            ##### Настройка Azure
+                             > [как развернуть модель](https://learn.microsoft.com/zh-cn/azure/ai-services/openai/how-to/create-resource)
+                            - **API Key**: [создать в Azure Portal](https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/CognitiveServicesHub/~/OpenAI)
+                            - **Base Url**: оставьте пустым
+                            - **Model Name**: укажите фактическое имя deployment
                             """
 
             if llm_provider == "gemini":
@@ -442,11 +442,11 @@ if not config.app.get("hide_config", False):
 
                 with llm_helper:
                     tips = """
-                            ##### Gemini 配置说明
-                            > 需要VPN开启全局流量模式
-                            - **API Key**: [点击到官网申请](https://ai.google.dev/)
-                            - **Base Url**: 留空
-                            - **Model Name**: 比如 gemini-1.0-pro
+                            ##### Настройка Gemini
+                             > Может потребоваться VPN в режиме global traffic
+                            - **API Key**: [получить на официальном сайте](https://ai.google.dev/)
+                            - **Base Url**: оставьте пустым
+                            - **Model Name**: например gemini-1.0-pro
                             """
 
             if llm_provider == "grok":
@@ -457,10 +457,10 @@ if not config.app.get("hide_config", False):
 
                 with llm_helper:
                     tips = """
-                            ##### Grok 配置说明
-                            - **API Key**: 填写您的 GrokAPI 密钥
-                            - **Base Url**: 填写 GrokAPI 的基础 URL
-                            - **Model Name**: 比如 grok-4.3
+                            ##### Настройка Grok
+                            - **API Key**: укажите ваш ключ GrokAPI
+                            - **Base Url**: укажите базовый URL GrokAPI
+                            - **Model Name**: например grok-4.3
                             """
 
             if llm_provider == "groq":
@@ -471,10 +471,10 @@ if not config.app.get("hide_config", False):
 
                 with llm_helper:
                     tips = """
-                            ##### Groq 配置说明
-                            - **API Key**: [点击到官网申请](https://console.groq.com/keys)
-                            - **Base Url**: 固定为 https://api.groq.com/openai/v1
-                            - **Model Name**: 比如 llama-3.3-70b-versatile
+                            ##### Настройка Groq
+                            - **API Key**: [получить на официальном сайте](https://console.groq.com/keys)
+                            - **Base Url**: фиксированно https://api.groq.com/openai/v1
+                            - **Model Name**: например llama-3.3-70b-versatile
                             """
 
             if llm_provider == "deepseek":
@@ -484,10 +484,10 @@ if not config.app.get("hide_config", False):
                     llm_base_url = "https://api.deepseek.com"
                 with llm_helper:
                     tips = """
-                            ##### DeepSeek 配置说明
-                            - **API Key**: [点击到官网申请](https://platform.deepseek.com/api_keys)
-                            - **Base Url**: 固定为 https://api.deepseek.com
-                            - **Model Name**: 固定为 deepseek-chat
+                            ##### Настройка DeepSeek
+                            - **API Key**: [получить на официальном сайте](https://platform.deepseek.com/api_keys)
+                            - **Base Url**: фиксированно https://api.deepseek.com
+                            - **Model Name**: фиксированно deepseek-chat
                             """
 
             if llm_provider == "mimo":
@@ -497,10 +497,10 @@ if not config.app.get("hide_config", False):
                     llm_base_url = "https://api.xiaomimimo.com/v1"
                 with llm_helper:
                     tips = """
-                            ##### Xiaomi MiMo 配置说明
-                            - **API Key**: [点击到官网申请](https://platform.xiaomimimo.com/docs/zh-CN/quick-start/first-api-call)
-                            - **Base Url**: 固定为 https://api.xiaomimimo.com/v1
-                            - **Model Name**: 默认 mimo-v2.5-pro，也可以按官方文档填写其它可用模型
+                            ##### Настройка Xiaomi MiMo
+                            - **API Key**: [получить на официальном сайте](https://platform.xiaomimimo.com/docs/zh-CN/quick-start/first-api-call)
+                            - **Base Url**: фиксированно https://api.xiaomimimo.com/v1
+                            - **Model Name**: по умолчанию mimo-v2.5-pro; можно указать другую доступную модель по официальной документации
                             """
 
             if llm_provider == "modelscope":
@@ -510,19 +510,19 @@ if not config.app.get("hide_config", False):
                     llm_base_url = "https://api-inference.modelscope.cn/v1/"
                 with llm_helper:
                     tips = """
-                            ##### ModelScope 配置说明
-                            - **API Key**: [点击到官网申请](https://modelscope.cn/docs/model-service/API-Inference/intro)
-                            - **Base Url**: 固定为 https://api-inference.modelscope.cn/v1/
-                            - **Model Name**: 比如 Qwen/Qwen3-32B，[点击查看模型列表](https://modelscope.cn/models?filter=inference_type&page=1)
+                            ##### Настройка ModelScope
+                            - **API Key**: [получить на официальном сайте](https://modelscope.cn/docs/model-service/API-Inference/intro)
+                            - **Base Url**: фиксированно https://api-inference.modelscope.cn/v1/
+                            - **Model Name**: например Qwen/Qwen3-32B, [список моделей](https://modelscope.cn/models?filter=inference_type&page=1)
                             """
 
             if llm_provider == "ernie":
                 with llm_helper:
                     tips = """
-                            ##### 百度文心一言 配置说明
-                            - **API Key**: [点击到官网申请](https://console.bce.baidu.com/qianfan/ais/console/applicationConsole/application)
-                            - **Secret Key**: [点击到官网申请](https://console.bce.baidu.com/qianfan/ais/console/applicationConsole/application)
-                            - **Base Url**: 填写 **请求地址** [点击查看文档](https://cloud.baidu.com/doc/WENXINWORKSHOP/s/jlil56u11#%E8%AF%B7%E6%B1%82%E8%AF%B4%E6%98%8E)
+                            ##### Настройка Baidu ERNIE
+                            - **API Key**: [получить на официальном сайте](https://console.bce.baidu.com/qianfan/ais/console/applicationConsole/application)
+                            - **Secret Key**: [получить на официальном сайте](https://console.bce.baidu.com/qianfan/ais/console/applicationConsole/application)
+                            - **Base Url**: укажите **адрес запроса**, [документация](https://cloud.baidu.com/doc/WENXINWORKSHOP/s/jlil56u11#%E8%AF%B7%E6%B1%82%E8%AF%B4%E6%98%8E)
                             """
 
             if llm_provider == "pollinations":
@@ -530,10 +530,10 @@ if not config.app.get("hide_config", False):
                     llm_model_name = "default"
                 with llm_helper:
                     tips = """
-                            ##### Pollinations AI Configuration
-                            - **API Key**: Optional - Leave empty for public access
-                            - **Base Url**: Default is https://text.pollinations.ai/openai
-                            - **Model Name**: Use 'openai-fast' or specify a model name
+                            ##### Настройка Pollinations AI
+                            - **API Key**: необязательно; оставьте пустым для публичного доступа
+                            - **Base Url**: по умолчанию https://text.pollinations.ai/openai
+                            - **Model Name**: используйте 'openai-fast' или укажите имя модели
                             """
 
             if llm_provider == "litellm":
@@ -541,19 +541,19 @@ if not config.app.get("hide_config", False):
                     llm_model_name = "openai/gpt-4o-mini"
                 with llm_helper:
                     tips = """
-                            ##### LiteLLM Configuration
-                            > [LiteLLM](https://github.com/BerriAI/litellm) routes to 100+ LLM providers via a unified interface.
-                            > Set your provider's API key as an env var: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `AWS_ACCESS_KEY_ID`, etc.
-                            - **Model Name**: LiteLLM format — `openai/gpt-4o`, `anthropic/claude-sonnet-4-20250514`, `bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0`, `gemini/gemini-2.5-flash`. See [full provider list](https://docs.litellm.ai/docs/providers)
+                            ##### Настройка LiteLLM
+                            > [LiteLLM](https://github.com/BerriAI/litellm) маршрутизирует запросы к 100+ LLM-провайдерам через единый интерфейс.
+                            > Укажите API key провайдера в переменной окружения: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `AWS_ACCESS_KEY_ID` и т. д.
+                            - **Model Name**: формат LiteLLM — `openai/gpt-4o`, `anthropic/claude-sonnet-4-20250514`, `bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0`, `gemini/gemini-2.5-flash`. См. [полный список провайдеров](https://docs.litellm.ai/docs/providers)
                             """
 
             if tips and config.ui["language"] == "zh":
-                # AIHubMix 自身就是 OpenAI-compatible 聚合平台；用户主动选择
-                # 该 provider 时，再显示 DeepSeek/Moonshot 的通用推荐会造成
-                # 信息干扰，也不利于保持合作入口的轻量、清晰。
+                # AIHubMix сам является OpenAI-compatible агрегатором. Когда пользователь явно выбирает
+                # этого provider, дополнительная общая рекомендация DeepSeek/Moonshot создает
+                # информационный шум и мешает сохранить партнерский вход простым и понятным.
                 if llm_provider != "aihubmix":
                     st.warning(
-                        "中国用户建议使用 **DeepSeek** 或 **Moonshot** 作为大模型提供商\n- 国内可直接访问，不需要VPN \n- 注册就送额度，基本够用"
+                        "Пользователям из Китая рекомендуется использовать **DeepSeek** или **Moonshot** как LLM-провайдера\n- доступно напрямую в Китае, VPN не нужен \n- после регистрации выдается стартовый лимит, которого обычно достаточно"
                     )
                 st.info(tips)
 
@@ -626,7 +626,7 @@ if not config.app.get("hide_config", False):
                 if st_llm_account_id:
                     config.app[f"{llm_provider}_account_id"] = st_llm_account_id
 
-        # 右侧面板 - API 密钥设置
+        # Правая панель — настройки API keys
         with right_config_panel:
 
             def get_keys_from_config(cfg_key):
@@ -793,7 +793,7 @@ with middle_panel:
         config.app["video_source"] = params.video_source
 
         if params.video_source == "local":
-            # Streamlit 的文件类型校验对扩展名大小写敏感，这里同时放行大小写两种形式。
+            # Проверка типов файлов в Streamlit чувствительна к регистру расширения, поэтому разрешаем оба варианта.
             local_file_types = ["mp4", "mov", "avi", "flv", "mkv", "jpg", "jpeg", "png"]
             uploaded_files = st.file_uploader(
                 tr("Upload Local Files"),
@@ -815,7 +815,7 @@ with middle_panel:
             video_concat_modes[selected_index][1]
         )
 
-        # 视频转场模式
+        # Режим видеопереходов
         video_transition_modes = [
             (tr("None"), VideoTransitionMode.none.value),
             (tr("Shuffle"), VideoTransitionMode.shuffle.value),
@@ -883,7 +883,7 @@ with middle_panel:
     with st.container(border=True):
         st.write(tr("Audio Settings"))
 
-        # 添加TTS服务器选择下拉框
+        # Добавляем выпадающий список выбора TTS-сервера
         tts_servers = [
             (voice.NO_VOICE_NAME, tr("No Voice")),
             ("azure-tts-v1", "Azure TTS V1"),
@@ -893,7 +893,7 @@ with middle_panel:
             ("mimo-tts", "Xiaomi MiMo TTS"),
         ]
 
-        # 获取保存的TTS服务器，默认为v1
+        # Получаем сохраненный TTS-сервер; по умолчанию v1
         saved_tts_server = config.ui.get("tts_server", "azure-tts-v1")
         saved_tts_server_index = 0
         for i, (server_value, _) in enumerate(tts_servers):
@@ -911,34 +911,34 @@ with middle_panel:
         selected_tts_server = tts_servers[selected_tts_server_index][0]
         config.ui["tts_server"] = selected_tts_server
 
-        # 根据选择的TTS服务器获取声音列表
+        # Получаем список голосов в соответствии с выбранным TTS-сервером
         filtered_voices = []
 
         if selected_tts_server == voice.NO_VOICE_NAME:
-            # 无配音是显式模式，只提供一个稳定 sentinel。这样普通 TTS 的空配置
-            # 不会被误判为静音，后端也能继续通过同一条音频/字幕流程生成视频。
+            # Режим без озвучки — явный режим, поэтому предоставляем стабильный sentinel. Так пустая конфигурация обычного TTS
+            # не будет ошибочно считаться тишиной, а backend сможет продолжить генерацию через общий audio/subtitle flow.
             filtered_voices = [voice.NO_VOICE_NAME]
         elif selected_tts_server == "siliconflow":
-            # 获取硅基流动的声音列表
+            # Получаем список голосов SiliconFlow
             filtered_voices = voice.get_siliconflow_voices()
         elif selected_tts_server == "gemini-tts":
-            # 获取Gemini TTS的声音列表
+            # Получаем список голосов Gemini TTS
             filtered_voices = voice.get_gemini_voices()
         elif selected_tts_server == "mimo-tts":
-            # 获取 Xiaomi MiMo TTS 的预置音色列表
+            # Получаем список предустановленных голосов Xiaomi MiMo TTS
             filtered_voices = voice.get_mimo_voices()
         else:
-            # 获取Azure的声音列表
+            # Получаем список голосов Azure
             all_voices = voice.get_all_azure_voices(filter_locals=None)
 
-            # 根据选择的TTS服务器筛选声音
+            # Фильтруем голоса по выбранному TTS-серверу
             for v in all_voices:
                 if selected_tts_server == "azure-tts-v2":
-                    # V2版本的声音名称中包含"v2"
+                    # В именах голосов V2 содержится "v2"
                     if "V2" in v:
                         filtered_voices.append(v)
                 else:
-                    # V1版本的声音名称中不包含"v2"
+                    # В именах голосов V1 не содержится "v2"
                     if "V2" not in v:
                         filtered_voices.append(v)
 
@@ -955,21 +955,21 @@ with middle_panel:
         saved_voice_name = config.ui.get("voice_name", "")
         saved_voice_name_index = 0
 
-        # 检查保存的声音是否在当前筛选的声音列表中
+        # Проверяем, есть ли сохраненный голос в текущем отфильтрованном списке
         if saved_voice_name in friendly_names:
             saved_voice_name_index = list(friendly_names.keys()).index(saved_voice_name)
         else:
-            # 如果不在，则根据当前UI语言选择一个默认声音
+            # Если его нет, выбираем голос по умолчанию на основе текущего языка UI
             for i, v in enumerate(filtered_voices):
                 if v.lower().startswith(st.session_state["ui_language"].lower()):
                     saved_voice_name_index = i
                     break
 
-        # 如果没有找到匹配的声音，使用第一个声音
+        # Если подходящий голос не найден, используем первый голос
         if saved_voice_name_index >= len(friendly_names) and friendly_names:
             saved_voice_name_index = 0
 
-        # 确保有声音可选
+        # Убеждаемся, что есть доступный голос
         if friendly_names:
             selected_friendly_name = st.selectbox(
                 tr("Speech Synthesis"),
@@ -985,7 +985,7 @@ with middle_panel:
             params.voice_name = voice_name
             config.ui["voice_name"] = voice_name
         else:
-            # 如果没有声音可选，显示提示信息
+            # Если голосов нет, показываем подсказку
             st.warning(
                 tr(
                     "No voices available for the selected TTS server. Please select another server."
@@ -994,7 +994,7 @@ with middle_panel:
             params.voice_name = ""
             config.ui["voice_name"] = ""
 
-        # 无配音模式会生成静音占位音频，不展示试听按钮，避免用户误以为需要测试声音。
+        # Режим без озвучки создает тихий placeholder-аудиофайл; кнопку предпрослушивания не показываем, чтобы пользователь не подумал, что нужно тестировать голос.
         if (
             friendly_names
             and selected_tts_server != voice.NO_VOICE_NAME
@@ -1031,7 +1031,7 @@ with middle_panel:
                     if os.path.exists(audio_file):
                         os.remove(audio_file)
 
-        # 当选择V2版本或者声音是V2声音时，显示服务区域和API key输入框
+        # При выборе версии V2 или V2-голоса показываем поля региона сервиса и API key
         if selected_tts_server == "azure-tts-v2" or (
             voice_name and voice.is_azure_v2_voice(voice_name)
         ):
@@ -1051,7 +1051,7 @@ with middle_panel:
             config.azure["speech_region"] = azure_speech_region
             config.azure["speech_key"] = azure_speech_key
 
-        # 当选择硅基流动时，显示API key输入框和说明信息
+        # При выборе SiliconFlow показываем поле API key и справочную информацию
         if selected_tts_server == "siliconflow" or (
             voice_name and voice.is_siliconflow_voice(voice_name)
         ):
@@ -1064,7 +1064,7 @@ with middle_panel:
                 key="siliconflow_api_key_input",
             )
 
-            # 显示硅基流动的说明信息
+            # Показываем справочную информацию SiliconFlow
             st.info(
                 tr("SiliconFlow TTS Settings")
                 + ":\n"
@@ -1077,8 +1077,8 @@ with middle_panel:
 
             config.siliconflow["api_key"] = siliconflow_api_key
 
-        # 当选择 Xiaomi MiMo TTS 时，复用 MiMo LLM provider 的 API Key。
-        # 这样用户如果同时使用 MiMo 生成文案和语音，只需要维护一份密钥。
+        # При выборе Xiaomi MiMo TTS повторно используем API Key MiMo LLM provider.
+        # Если пользователь использует MiMo и для текста, и для озвучки, достаточно поддерживать один ключ.
         if selected_tts_server == "mimo-tts" or (
             voice_name and voice.is_mimo_voice(voice_name)
         ):
@@ -1155,11 +1155,11 @@ with middle_panel:
                 tr("Custom Background Music File"), key="custom_bgm_file_input"
             )
             if custom_bgm_file:
-                # 这里不直接用 os.path.exists 判断，因为用户常见输入是
-                # output000.mp3，这个文件名需要由服务层映射到 resource/songs
-                # 目录后再校验。服务层会统一限制目录和文件类型，避免任意路径读取。
+                # Здесь не используем os.path.exists напрямую, потому что пользователь часто вводит
+                # имя вроде output000.mp3; сервисный слой должен сначала сопоставить его с каталогом resource/songs
+                # и только затем проверить. Сервисный слой централизованно ограничивает каталог и тип файла, исключая произвольное чтение путей.
                 params.bgm_file = custom_bgm_file.strip()
-                # st.write(f":red[已选择自定义背景音乐]：**{custom_bgm_file}**")
+                # st.write(f":red[Выбрана пользовательская фоновая музыка]: **{custom_bgm_file}**")
         params.bgm_volume = st.selectbox(
             tr("Background Music Volume"),
             options=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
@@ -1262,8 +1262,8 @@ with right_panel:
         saved_rounded_subtitle_background = config.ui.get(
             "rounded_subtitle_background", False
         )
-        # 背景关闭时，圆角背景没有可渲染的底色。这里禁用控件并保留原配置，
-        # 用户下次重新开启字幕背景后，可以继续使用之前保存的圆角偏好。
+        # Когда фон отключен, скругленному фону нечего отрисовывать. Отключаем контрол и сохраняем старую конфигурацию,
+        # чтобы при повторном включении фона субтитров пользователь мог продолжить с прежней настройкой скругления.
         params.rounded_subtitle_background = st.checkbox(
             tr("Rounded Subtitle Background"),
             value=(
@@ -1368,8 +1368,8 @@ if start_button:
 
     if uploaded_audio_file:
         task_dir = utils.task_dir(task_id)
-        # 上传文件名来自浏览器，不能直接拼到磁盘路径里；这里只保留扩展名，
-        # 并使用固定文件名保存到当前任务目录，避免路径穿越或特殊字符问题。
+        # Имя загруженного файла приходит из браузера, его нельзя напрямую склеивать с дисковым путем; здесь сохраняем только расширение
+        # и используем фиксированное имя файла в каталоге текущей задачи, чтобы избежать path traversal и проблем со спецсимволами.
         _, audio_ext = os.path.splitext(os.path.basename(uploaded_audio_file.name))
         audio_ext = audio_ext.lower() or ".mp3"
         custom_audio_path = os.path.join(task_dir, f"custom-audio{audio_ext}")
@@ -1379,7 +1379,7 @@ if start_button:
 
     if uploaded_files:
         local_videos_dir = utils.storage_dir("local_videos", create=True)
-        # 每次重新上传时都以本次选择的素材为准，避免旧素材不断重复追加。
+        # При каждой новой загрузке используем только материалы текущего выбора, чтобы старые материалы не добавлялись повторно.
         params.video_materials = []
         persisted_local_materials = []
         for file in uploaded_files:
@@ -1397,10 +1397,10 @@ if start_button:
                         "duration": m.duration,
                     }
                 )
-        # 将已上传并保存到本地的视频素材写入会话，供后续只改文案时直接复用。
+        # Записываем загруженные и сохраненные локально видеоматериалы в сессию, чтобы повторно использовать их при изменении только сценария.
         st.session_state["local_video_materials"] = persisted_local_materials
     elif params.video_source == "local" and st.session_state["local_video_materials"]:
-        # 当用户没有重新上传文件时，复用最近一次已经保存到磁盘的本地素材列表。
+        # Если пользователь не загружал файлы заново, используем последний список локальных материалов, уже сохраненных на диск.
         params.video_materials = []
         for material in st.session_state["local_video_materials"]:
             m = MaterialInfo()

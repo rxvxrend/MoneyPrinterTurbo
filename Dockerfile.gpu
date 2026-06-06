@@ -1,16 +1,16 @@
-# Use NVIDIA CUDA runtime as parent image (includes CUDA 12.1 + cuDNN 8)
+# Используем NVIDIA CUDA runtime как базовый образ (включает CUDA 12.1 + cuDNN 8)
 FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
-# Avoid interactive timezone prompt
+# Отключаем интерактивный запрос часового пояса
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Set the working directory in the container
+# Задаем рабочий каталог в контейнере
 WORKDIR /MoneyPrinterTurbo
 RUN chmod 777 /MoneyPrinterTurbo
 
 ENV PYTHONPATH="/MoneyPrinterTurbo"
 
-# Install Python 3.11 and system dependencies
+# Устанавливаем Python 3.11 и системные зависимости
 RUN apt-get update && apt-get install -y --no-install-recommends \
         software-properties-common \
         git \
@@ -29,13 +29,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         && apt-get remove -y python3-blinker || true \
         && rm -rf /var/lib/apt/lists/*
 
-# Fix security policy for ImageMagick
+# Исправляем политику безопасности ImageMagick
 RUN sed -i '/<policy domain="path" rights="none" pattern="@\*"/d' /etc/ImageMagick-6/policy.xml
 
-# Copy only the requirements.txt first to leverage Docker cache
+# Сначала копируем только requirements.txt, чтобы использовать Docker cache
 COPY requirements.txt ./
 
-# Install Python dependencies
+# Устанавливаем Python-зависимости
 RUN python3 -m pip install --no-cache-dir \
     -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com \
     --retries 3 --timeout 60 -r requirements.txt || \
@@ -45,11 +45,11 @@ RUN python3 -m pip install --no-cache-dir \
     python3 -m pip install --no-cache-dir \
     --retries 3 --timeout 60 -r requirements.txt
 
-# Now copy the rest of the codebase into the image
+# Затем копируем остальной код в образ
 COPY . .
 
-# Expose the port the app runs on
+# Открываем порт, на котором работает приложение
 EXPOSE 8501
 
-# Command to run the application
+# Команда запуска приложения
 CMD ["streamlit", "run", "./webui/Main.py","--browser.serverAddress=127.0.0.1","--server.enableCORS=True","--browser.gatherUsageStats=False"]
